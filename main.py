@@ -1,15 +1,26 @@
-from readfile import readfile
 from mlp.network import Network
+import numpy as np
 
-x_train = readfile.getXtrainData("X.txt")
-y_train = readfile.getYTrainData("Y_letra.txt")
+dados_treinamento = np.load("X.npy")
+dados_rotulos = np.load("Y_classe.npy")
 
-mlp = Network(input_size=120, hidden_size=60, output_size=26)
+matriz_dados = []
 
-mlp.train(x_train, y_train, epochs=1000, learning_rate=0.1)
+for dados in dados_treinamento:
+    letra = dados.flatten().reshape(120, 1)
+    letra[letra == -1] = 0 
+    matriz_dados.append(letra)
 
-train_accuracy = mlp.calculate_accuracy(x_train, y_train)
+network = Network(120, 60, 26)
 
-print(f'Acurácia no conjunto de treinamento: {train_accuracy * 100:.2f}%')
+print(network.feedForward(matriz_dados[1325]))
 
-mlp.plot_loss()
+network.treino(
+    numero_de_epocas=1000, 
+    vetor_dados_entrada = matriz_dados[:858],
+    vetor_dados_saida = dados_rotulos[:858],
+    vetor_dados_entrada_validacao = matriz_dados[858:1196],
+    vetor_dados_saida_validacao = dados_rotulos[858:1196]
+    )
+
+print(network.feedForward(matriz_dados[1325]))

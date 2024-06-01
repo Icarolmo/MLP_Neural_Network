@@ -1,5 +1,7 @@
+import string
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # RedeMLP classe que representa uma rede MLP com as estruturas e métodos necessários para funcionamento
 class RedeMLP:
@@ -22,43 +24,12 @@ class RedeMLP:
         self.erro_quadratico_medio_treinamento = []
         self.erro_quadratico_medio_validacao = []
         
-        
-    # salvarPesos utilizado para salvar no diretorio "log" os pesos iniciais e finais das camadas
-    def salvarPesos(self, diretorio):
-        np.save(f'log/{diretorio}/pesos-camada_entrada_para_escondida.npy', self.pesos_entrada_escondida)
-        np.save(f'log/{diretorio}/pesos-camada_escondida_para_saida.npy', self.pesos_escondida_saida)
-        np.save(f'log/{diretorio}/bias-camada_entrada_para_escondida.npy', self.bias_camada_entrada_escondida)
-        np.save(f'log/{diretorio}/bias-camada_escondida_para_saida.npy', self.bias_camada_escondida_saida)
+    def salvarPesos(self, diretorio, tipo_pesos, rodada, acuracia):
+        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_camada_entrada_para_escondida_{acuracia}-{rodada}.npy', self.pesos_entrada_escondida)
+        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_camada_escondida_para_saida_{acuracia}-{rodada}.npy', self.pesos_escondida_saida)
+        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_bias_camada_entrada_para_escondida_{acuracia}-{rodada}.npy', self.bias_camada_entrada_escondida)
+        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_bias_camada_escondida_para_saida_{acuracia}-{rodada}.npy', self.bias_camada_escondida_saida)
     
-    # iniciarTreinamento recebe o número de epocas e os vetores de treinamento e testes junto a seus respectivos
-    # rótulos e realiza o treinamento da rede utilizando para passagem das camadas feedFoward com a função de 
-    # ativação Sigmoid, calcula o erro e ajusta com backpropagation.
-    def iniciarTreinamentoComCrossValidation(self,
-                           vetor_dados_entrada = [], 
-                           vetor_dados_saida = [],
-                           numero_de_folds = 10
-                           ):
-        
-        # particiona os vetores conforme o numero de folds definido
-        vetores_particionados = np.array_split(vetor_dados_entrada, numero_de_folds)
-        rotulos_particionados = np.array_split(vetor_dados_saida, numero_de_folds)
-        
-        # itera sobre os vetores particionados
-        for i in range(len(vetores_particionados)): 
-            # para cada particao itera sobre o conjunto de vetores com dados daquela partição
-            for j in range(len(vetores_particionados[i])): 
-                if i == j: continue # verifica se a particao atual é a partição de teste, se for pula para próxima
-                vetor = vetores_particionados[i][j]
-                rotulo = rotulos_particionados[i][j]
-                
-                # realiza o feed forward e backpropagation para a particao atual
-                vetor_avanco_calculado = self.feedForward(vetor)
-                self.backpropagation(vetor, vetor_avanco_calculado, rotulo)
-
-            self.erro_quadratico_medio_validacao.append(self.estimarErroQuadraticoMedio(vetores_particionados[i], rotulos_particionados[i]))
-        
-        self.plotarErroQuadraticoMedioValidacao(numero_de_epocas=numero_de_folds)
-                
     # iniciarTreinamento recebe o número de epocas e os vetores de treinamento e testes junto a seus respectivos
     # rótulos e realiza o treinamento da rede utilizando para passagem das camadas feedFoward com a função de 
     # ativação Sigmoid, calcula o erro e ajusta com backpropagation.    
@@ -81,9 +52,7 @@ class RedeMLP:
             # calcula o erro quadratico medio para o conjunto de treinamento e teste para a epoca atual
             self.erro_quadratico_medio_treinamento.append(self.estimarErroQuadraticoMedio(vetor_dados_entrada, vetor_dados_saida))
             self.erro_quadratico_medio_validacao.append(self.estimarErroQuadraticoMedio(vetor_dados_validacao, vetor_rotulos_validacao))
-            
-            if epoca % 99 == 0:
-                print("Epoca: ", epoca + 1)
+    
                 
     
     # plotarErroQuadraticoMedio plota um gráfico com erro quadratico médio dos dados de treinamento e validacao conforme o treinamento durante as épocas
@@ -137,23 +106,15 @@ class RedeMLP:
         
         # Calculo do delta da camada de saída
         camada_saida_delta = vetor_erro * self.funcaoDerivadaSigmoid(self.calculo_avanco_escondida_saida)
-        self.ajuste_pesos_escondida_saida = (
-            self.calculo_saida_escondida.T * np.array(camada_saida_delta * self.taxa_de_aprendizagem).reshape(-1, 1)
-        )
+        self.ajuste_pesos_escondida_saida = (self.calculo_saida_escondida.T * np.array(camada_saida_delta * self.taxa_de_aprendizagem).reshape(-1, 1))
         
         # Calculo do delta da camada escondida
         camada_escondida_delta = (self.pesos_escondida_saida.dot(camada_saida_delta).T * self.funcaoDerivadaSigmoid(self.calculo_avanco_entrada_escondida))
-        self.ajuste_pesos_entrada_escondida = (
-            np.array(vetor_saida).reshape(-1, 1) * np.array(camada_escondida_delta * self.taxa_de_aprendizagem).reshape(-1, 1).T
-        )
+        self.ajuste_pesos_entrada_escondida = (np.array(vetor_saida).reshape(-1, 1) * np.array(camada_escondida_delta * self.taxa_de_aprendizagem).reshape(-1, 1).T)
         
         # Atualização dos pesos
-        self.pesos_escondida_saida = (
-            self.pesos_escondida_saida + self.ajuste_pesos_escondida_saida.T
-        )
-        self.pesos_entrada_escondida = (
-            self.pesos_entrada_escondida + self.ajuste_pesos_entrada_escondida
-        )
+        self.pesos_escondida_saida = (self.pesos_escondida_saida + self.ajuste_pesos_escondida_saida.T) 
+        self.pesos_entrada_escondida = (self.pesos_entrada_escondida + self.ajuste_pesos_entrada_escondida)
     
     # funcaoSigmoid calcula a ativação Sigmoid
     def funcaoSigmoid(self, valor):
@@ -175,7 +136,39 @@ class RedeMLP:
         
         return np.around(self.vetor_saida, 3)
             
-            
+    def plotarMatrizDeConfusao(self, matriz_entrada, matriz_saida_esperada, diretorio, rodada, acuracia):
+        # Criar uma lista com todas as letras do alfabeto
+        letras_alfabeto = list(string.ascii_uppercase)
+
+        # Criar um DataFrame com índices e colunas como as letras do alfabeto, inicializando com zeros
+        df = pd.DataFrame(0, index=letras_alfabeto, columns=letras_alfabeto)
+         
+        # Função para obter letra dado um array
+        def pegarLetraCorrespondente(array):
+
+            # Obter o índice do maior valor no array
+            maior_indice = np.argmax(array)
+
+            # Converter o índice na letra correspondente
+            letra = string.ascii_uppercase[maior_indice]
+
+            return letra
+
+        # Função para incrementar uma célula na tabela
+        def incrementarCelula(df, linha, coluna):
+            df.at[linha, coluna] += 1
+
+        for vetor_entrada, vetor_saida_esperado in zip(matriz_entrada, matriz_saida_esperada):
+            saida_rede = np.array(self.feedForward(vetor_entrada))
+            letra_prevista = pegarLetraCorrespondente(saida_rede)
+            letra_esperada = pegarLetraCorrespondente(vetor_saida_esperado)
+
+            incrementarCelula(df, letra_esperada, letra_prevista)
+        
+        print("\n --------------------------------- MATRIZ DE CONFUSÃO DA REDE -----------------------------")
+        print(df)
+        
+        df.to_excel(f"log/configuracao/{diretorio}/finais/matriz_de_confusao-{rodada}-{acuracia}.xlsx" , index=False)
     
     # converterVetorMultidimensional recebe vetor de dados de treinamento e transforma em vetor bidimensional
     @staticmethod
@@ -189,3 +182,11 @@ class RedeMLP:
             matriz_dados.append(letra)
 
         return matriz_dados
+    
+    @staticmethod
+    def retirarVetorDaLista(vetor, indice):
+        return [item for i, item in enumerate(vetor) if i != indice]    
+        
+    @staticmethod    
+    def unirFolds(lista_de_tuplas):
+        return [lista_de_tuplas[x][y] for x in range(len(lista_de_tuplas)) for y in range(len(lista_de_tuplas[x]))]

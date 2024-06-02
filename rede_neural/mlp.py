@@ -1,3 +1,6 @@
+import os
+import random
+import shutil
 import string
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,15 +10,14 @@ import pandas as pd
 class RedeMLP:
 
     # __init__ método construtor da classe RedeMLP que recebe o número de neurônios de cada camada e a 
-    # taxa de aprendizagem e inicializa os pesos aleatoriamente. Por default, caso não seja passado nenhum 
-    # valor especifico, temos 120 neurônios na camada de entrada, 30 na camada escondida e 26 na camada 
-    # de saida e 0.5 sendo a taxa de aprendizagem
-    def __init__(self, tam_camada_entrada=120, tam_camada_escondida=30, tam_camada_saida=26, taxa_de_aprendizagem=0.5):
+    # taxa de aprendizagem e inicializa os pesos aleatoriamente.
+    def __init__(self, tam_camada_entrada=120, tam_camada_escondida=55, tam_camada_saida=26, taxa_de_aprendizagem=0.5):
         self.tam_camada_entrada = tam_camada_entrada
         self.tam_camada_escondida = tam_camada_escondida
         self.tam_camada_saida = tam_camada_saida
         self.taxa_de_aprendizagem = taxa_de_aprendizagem
         
+        # Inicializando os pesos aleatoriamente com valores no intervalo de -1 a 1
         self.pesos_entrada_escondida = np.random.uniform(-1, 1, [self.tam_camada_entrada, self.tam_camada_escondida])
         self.pesos_escondida_saida = np.random.uniform(-1, 1, [self.tam_camada_escondida, self.tam_camada_saida])
         self.bias_camada_entrada_escondida = np.random.uniform(-1, 1)
@@ -23,100 +25,65 @@ class RedeMLP:
         
         self.erro_quadratico_medio_treinamento = []
         self.erro_quadratico_medio_validacao = []
-        
-    def salvarPesos(self, diretorio, tipo_pesos, rodada, acuracia):
-        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_camada_entrada_para_escondida_{acuracia}-{rodada}.npy', self.pesos_entrada_escondida)
-        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_camada_escondida_para_saida_{acuracia}-{rodada}.npy', self.pesos_escondida_saida)
-        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_bias_camada_entrada_para_escondida_{acuracia}-{rodada}.npy', self.bias_camada_entrada_escondida)
-        np.save(f'log/configuracao/{diretorio}/{tipo_pesos}/pesos_bias_camada_escondida_para_saida_{acuracia}-{rodada}.npy', self.bias_camada_escondida_saida)
+    
+    
+    # salvarPesos salva os pesos dos neurônios e bias no respectivo diretório passado por parâmetro    
+    def salvarPesos(self, diretorio):
+        np.save(f'log/configuracao/{diretorio}/pesos_camada_entrada_para_escondida.npy', self.pesos_entrada_escondida)
+        np.save(f'log/configuracao/{diretorio}/pesos_camada_escondida_para_saida.npy', self.pesos_escondida_saida)
+        np.save(f'log/configuracao/{diretorio}/pesos_bias_camada_entrada_para_escondida.npy', self.bias_camada_entrada_escondida)
+        np.save(f'log/configuracao/{diretorio}/pesos_bias_camada_escondida_para_saida.npy', self.bias_camada_escondida_saida)
     
     # iniciarTreinamento recebe o número de epocas e os vetores de treinamento e testes junto a seus respectivos
-    # rótulos e realiza o treinamento da rede utilizando para passagem das camadas feedFoward com a função de 
-    # ativação Sigmoid, calcula o erro e ajusta com backpropagation.    
+    # rótulos e realiza o treinamento da rede sem validação cruzada e parada antecipada utilizando como função de
+    # ativação a Sigmoid, feed foward para passagem dos valores e backpropagation para ajuste dos pesos. 
     def iniciarTreinamento(self, 
-                           numero_de_epocas = 100, 
-                           vetor_dados_entrada = [], 
-                           vetor_dados_saida = [],
-                           vetor_dados_validacao = [],
-                           vetor_rotulos_validacao = []
+                           numero_de_epocas = 50, 
+                           dados_treinamento = [], 
+                           rotulos_treinamento = [],
+                           dados_validacao = [],
+                           rotulos_validacao = []
                            ):
         
         # iterar o número de epocas
         for epoca in range(numero_de_epocas):
             
             # para cada epoca itera sobre o vetor de dados e realiza o treinamento com feed foward e backpropagation
-            for index in range(len(vetor_dados_entrada)):
-                vetor_avanco_calculado = self.feedForward(vetor_dados_entrada[index])
-                self.backpropagation( vetor_dados_entrada[index], vetor_avanco_calculado, vetor_dados_saida[index])
+            for index in range(len(dados_treinamento)):
+                rotulo_previsto = self.feedForward(dados_treinamento[index])
+                self.backpropagation(dados_treinamento[index], rotulo_previsto, rotulos_treinamento[index])
             
             # calcula o erro quadratico medio para o conjunto de treinamento e teste para a epoca atual
-            self.erro_quadratico_medio_treinamento.append(self.estimarErroQuadraticoMedio(vetor_dados_entrada, vetor_dados_saida))
-            self.erro_quadratico_medio_validacao.append(self.estimarErroQuadraticoMedio(vetor_dados_validacao, vetor_rotulos_validacao))
-    
-                
-    
-    # plotarErroQuadraticoMedio plota um gráfico com erro quadratico médio dos dados de treinamento e validacao conforme o treinamento durante as épocas
-    def plotarErroQuadraticoMedio(self, numero_de_epocas):
-        t = np.linspace(0, numero_de_epocas, numero_de_epocas)
-        plt.plot(t, self.erro_quadratico_medio_treinamento, 'r', label='Treinamento')
-        plt.plot(t, self.erro_quadratico_medio_validacao, 'y', label='Validação')
-        plt.legend()
-        plt.xlabel('Épocas')
-        plt.ylabel('Erro Quadrático Médio')
-        plt.show()
-        
-    # plotarErroQuadraticoMedioValidacao plota um gráfico com erro quadratico médio conforme o treinamento durante as épocas
-    def plotarErroQuadraticoMedioValidacao(self, numero_de_epocas):
-        t = np.linspace(0, numero_de_epocas, numero_de_epocas)
-        plt.plot(t, self.erro_quadratico_medio_validacao, 'y', label='Validação')
-        plt.legend()
-        plt.xlabel('Épocas')
-        plt.ylabel('Erro Quadrático Médio')
-        plt.show()
-        
-        
-    # estimarErroQuadraticoMedio estima o erro quadrático médio entre a saída prevista e a esperada
-    def estimarErroQuadraticoMedio(self, matriz_entrada, matriz_saida_esperada):
-        total_erro = 0
-
-        # Loop sobre cada amostra do conjunto de dados
-        for vetor_entrada, vetor_saida_esperado in zip(matriz_entrada, matriz_saida_esperada):
-            saida_rede = np.array(self.feedForward(vetor_entrada))
-            erro_saida = np.array(vetor_saida_esperado) - saida_rede
-            total_erro += np.sum(np.power(erro_saida, 2))
-
-        return total_erro / len(matriz_entrada) 
-    
-    # estimarAcuracia estima a acurácia do modelo comparando as saídas previstas com as esperadas          
-    def estimarAcuracia(self, matriz_entrada, matriz_saida_esperada):
-        total_acertos = 0
-        
-        # Loop sobre cada amostra do conjunto de dados
-        for vetor_entrada, vetor_saida_esperado in zip(matriz_entrada, matriz_saida_esperada):
-            saida_rede = np.array(self.feedForward(vetor_entrada))
-            if np.argmax(saida_rede) == np.argmax(vetor_saida_esperado):
-                total_acertos += 1
-        
-        return (total_acertos / len(matriz_entrada)) * 100  
+            self.erro_quadratico_medio_treinamento.append(
+                self.estimarErroQuadraticoMedio(dados_treinamento, rotulos_treinamento)
+                )
+            self.erro_quadratico_medio_validacao.append(
+                self.estimarErroQuadraticoMedio(dados_validacao, rotulos_validacao)
+                )
+            
     
     # backpropagation realiza o ajuste dos pesos com base no erro calculado entre a saída prevista e a esperada
-    def backpropagation(self, vetor_saida, vetor_saida_calculado, vetor_saida_esperada):
-        # Erro na camada de saída
-        vetor_erro = np.array(vetor_saida_esperada) - np.array(vetor_saida_calculado)
+    def backpropagation(self, vetor_saida, rotulo_previsto, rotulo_esperado):
+        # Erro do rotulo previsto na camada de saida
+        erro = np.array(rotulo_esperado) - np.array(rotulo_previsto)
         
-        # Calculo do delta da camada de saída
-        camada_saida_delta = vetor_erro * self.funcaoDerivadaSigmoid(self.calculo_avanco_escondida_saida)
-        self.ajuste_pesos_escondida_saida = (self.calculo_saida_escondida.T * np.array(camada_saida_delta * self.taxa_de_aprendizagem).reshape(-1, 1))
+        # Calculo do delta da camada de saída e calculo do ajuste dos pesos da escondida para saida
+        delta_da_camada_saida = erro * self.funcaoDerivadaSigmoid(self.calculo_avanco_escondida_saida)
+        self.ajuste_pesos_escondida_saida = (self.calculo_saida_escondida.T * np.array(delta_da_camada_saida * self.taxa_de_aprendizagem).reshape(-1, 1))
         
-        # Calculo do delta da camada escondida
-        camada_escondida_delta = (self.pesos_escondida_saida.dot(camada_saida_delta).T * self.funcaoDerivadaSigmoid(self.calculo_avanco_entrada_escondida))
-        self.ajuste_pesos_entrada_escondida = (np.array(vetor_saida).reshape(-1, 1) * np.array(camada_escondida_delta * self.taxa_de_aprendizagem).reshape(-1, 1).T)
+        # Calculo do delta da camada escondida e calculo do ajuste dos pesos da entrada para escondida
+        delta_da_camada_escondida = (self.pesos_escondida_saida.dot(delta_da_camada_saida).T * self.funcaoDerivadaSigmoid(self.calculo_avanco_entrada_escondida))
+        self.ajuste_pesos_entrada_escondida = (np.array(vetor_saida).reshape(-1, 1) * np.array(delta_da_camada_escondida * self.taxa_de_aprendizagem).reshape(-1, 1).T)
         
         # Atualização dos pesos
         self.pesos_escondida_saida = (self.pesos_escondida_saida + self.ajuste_pesos_escondida_saida.T) 
         self.pesos_entrada_escondida = (self.pesos_entrada_escondida + self.ajuste_pesos_entrada_escondida)
+        
+        # Atualização dos bias
+        self.bias_camada_escondida_saida = self.bias_camada_escondida_saida + self.taxa_de_aprendizagem * delta_da_camada_saida
+        self.bias_camada_entrada_escondida = self.bias_camada_entrada_escondida + self.taxa_de_aprendizagem * delta_da_camada_escondida
     
-    # funcaoSigmoid calcula a ativação Sigmoid
+    # funcaoSigmoid utilizada como função de ativação dos neurônios
     def funcaoSigmoid(self, valor):
         return 1 / (1 + np.exp(-valor))
 
@@ -134,59 +101,162 @@ class RedeMLP:
         self.calculo_avanco_escondida_saida = np.dot(self.pesos_escondida_saida.T, self.calculo_saida_escondida) + self.bias_camada_escondida_saida
         self.vetor_saida = self.funcaoSigmoid(self.calculo_avanco_escondida_saida)
         
-        return np.around(self.vetor_saida, 3)
-            
-    def plotarMatrizDeConfusao(self, matriz_entrada, matriz_saida_esperada, diretorio, rodada, acuracia):
+        return np.around(self.vetor_saida, 5)
+    
+    # plotarErroQuadraticoMedio plota um gráfico com erro quadratico médio dos dados de treinamento e validacao conforme o treinamento durante as épocas
+    def plotarErroQuadraticoMedio(self, numero_de_epocas):
+        t = np.linspace(0, numero_de_epocas, numero_de_epocas)
+        plt.plot(t, self.erro_quadratico_medio_treinamento, 'r', label='Treinamento')
+        plt.plot(t, self.erro_quadratico_medio_validacao, 'y', label='Validação')
+        plt.legend()
+        plt.xlabel('Épocas')
+        plt.ylabel('Erro Quadrático Médio')
+        plt.show()
+        
+    # estimarErroQuadraticoMedio estima o erro quadrático médio entre a saída prevista e a esperada
+    def estimarErroQuadraticoMedio(self, dados, rotulos):
+        erro_total = 0
+
+        # Loop sobre cada amostra do conjunto de dados
+        for dado, rotulo_esperado in zip(dados, rotulos):
+            rotulo_previsto = np.array(self.feedForward(dado))
+            erro = np.array(rotulo_esperado) - rotulo_previsto
+            erro_total += np.sum(np.power(erro, 2))
+
+        return erro_total / len(dados) 
+    
+    # estimarAcuracia estima a acurácia do modelo comparando as saídas previstas com as esperadas          
+    def estimarAcuracia(self, dados, rotulos):
+        total_acertos = 0
+        
+        # Loop sobre cada amostra do conjunto de dados
+        for dado, rotulo_esperado in zip(dados, rotulos):
+            rotulo_previsto = np.array(self.feedForward(dado))
+            if np.argmax(rotulo_previsto) == np.argmax(rotulo_esperado):
+                total_acertos += 1
+        
+        return round((total_acertos / len(dados)) * 100, 2)  
+    
+    # plotarMatrizDeConfusao plota uma matriz de confusão dado os dados de entrada e seus respectivos rotulos
+    def plotarMatrizDeConfusao(self, dados, rotulos, diretorio):
         # Criar uma lista com todas as letras do alfabeto
         letras_alfabeto = list(string.ascii_uppercase)
-
         # Criar um DataFrame com índices e colunas como as letras do alfabeto, inicializando com zeros
         df = pd.DataFrame(0, index=letras_alfabeto, columns=letras_alfabeto)
-         
-        # Função para obter letra dado um array
+        
+        # Função para obter a letra dado uma posição de maior valor de um array de 26 posições
         def pegarLetraCorrespondente(array):
-
             # Obter o índice do maior valor no array
             maior_indice = np.argmax(array)
-
             # Converter o índice na letra correspondente
             letra = string.ascii_uppercase[maior_indice]
-
+            
             return letra
 
         # Função para incrementar uma célula na tabela
         def incrementarCelula(df, linha, coluna):
             df.at[linha, coluna] += 1
 
-        for vetor_entrada, vetor_saida_esperado in zip(matriz_entrada, matriz_saida_esperada):
-            saida_rede = np.array(self.feedForward(vetor_entrada))
-            letra_prevista = pegarLetraCorrespondente(saida_rede)
-            letra_esperada = pegarLetraCorrespondente(vetor_saida_esperado)
-
+        # Iterando sobre os dados 
+        for dado, rotulo_esperado in zip(dados, rotulos):
+            # Calcula com o feed forward a letra prevista pela rede
+            rotulo_previsto = np.array(self.feedForward(dado))
+            # Dado o array de saida pega a letra correspondente para o rotulo previsto pela rede e o rotulo esperado
+            letra_prevista = pegarLetraCorrespondente(rotulo_previsto)
+            letra_esperada = pegarLetraCorrespondente(rotulo_esperado)
+            # Incrementa na matriz de confusão a posição na letra prevista e a letra esperada
             incrementarCelula(df, letra_esperada, letra_prevista)
+            
+        # Ajuste para incluir as letras na primeira linha e primeira coluna
+        df.index.name = ''
+        df.columns.name = ''
         
-        print("\n --------------------------------- MATRIZ DE CONFUSÃO DA REDE -----------------------------")
-        print(df)
-        
-        df.to_excel(f"log/configuracao/{diretorio}/finais/matriz_de_confusao-{rodada}-{acuracia}.xlsx" , index=False)
+        # Salva a matriz em um arquivo excel no diretório passado por parâmetro
+        df.to_excel(f"log/configuracao/{diretorio}/matriz_de_confusao.xlsx")
     
-    # converterVetorMultidimensional recebe vetor de dados de treinamento e transforma em vetor bidimensional
+    # converterVetorMultidimensional recebe vetor de dados de treinamento e transforma em vetor bidimensional para melhor manipulação
     @staticmethod
     def converterVetorMultidimensional(vetor_multidimensional):
         matriz_dados = []
-        
+        # Itera sobre o vetor de maior dimensões
         for dados in vetor_multidimensional:
-            # Transforma-se o array complexo (cada elemento do arquivo_x - uma letra) em um array unidimensional, por meio da função flatten
-            letra = dados.flatten()
-            letra[letra == -1] = 0 # Substitui-se os valores -1 por 0
-            matriz_dados.append(letra)
+            # utiliza da função flatten para transformar o vetor "dados" de mais dimensões em um vetor unidimensional
+            dado = dados.flatten()
+            # Substitui os valores -1 por 0 para melhor manipulação
+            dado[dado == -1] = 0 
+            # Adiciona o vetor agora unidimensional a matriz de dados
+            matriz_dados.append(dado)
 
         return matriz_dados
     
+    # retiraVetorDaLista recebe uma lista e retira dela o vetor na posição dada pelo indice passado por parâmetro
     @staticmethod
     def retirarVetorDaLista(vetor, indice):
         return [item for i, item in enumerate(vetor) if i != indice]    
-        
+    
+    # unirFolds recebe uma lista que contém os folds de treinamento e realiza a união deles em um vetor bidimensional
     @staticmethod    
-    def unirFolds(lista_de_tuplas):
-        return [lista_de_tuplas[x][y] for x in range(len(lista_de_tuplas)) for y in range(len(lista_de_tuplas[x]))]
+    def unirFolds(lista):
+        return [lista[x][y] for x in range(len(lista)) for y in range(len(lista[x]))]
+    
+    # holdout realiza o holdoult dos dados embaralhando-os aleatoriamente e retorando os dados de treinamento e 
+    # teste em uma proporção de 80% para treinamento e 20% para teste
+    @staticmethod  
+    def holdout(dados, rotulos):
+        # Criar um array de índices para Holdout
+        indices = list(range(len(dados)))
+
+        # Embaralhar os índices
+        random.shuffle(indices)
+
+        # Reorganizar os arrays de dados e rótulos com base nos índices embaralhados randomicamente
+        dados_embaralhados = [dados[i] for i in indices]
+        rotulos_embaralhados = [rotulos[i] for i in indices]
+
+        # Calcular o tamanho do conjunto de dados para repartição dos dados de teste e treinamento
+        # na proporção já citada
+        reparticao =  (len(dados_embaralhados) // 10) * 8
+
+        # Dividi os dados de treinamento e teste de acordo com a repaticao
+        dados_treinamento = dados_embaralhados[:reparticao]
+        rotulos_treinamento = rotulos_embaralhados[:reparticao]
+        dados_teste = dados_embaralhados[reparticao:]
+        rotulos_teste = rotulos_embaralhados[reparticao:]
+        
+        # retorna os dados de treinamento e teste com seus respectivos rotulos
+        return dados_treinamento, rotulos_treinamento, dados_teste, rotulos_teste
+    
+    # criarLimparPastaConfiguracao realiza a limpeza (exclusão de arquivos) na pasta de log/configuracao
+    # e cria subspastas para armazenamento de pesos e matrizes de confusão 
+    @staticmethod
+    def criarLimparPastasConfiguracao(numero_de_folds):
+        # Função para excluir arquivos já existentes na pasta ou criar pasta caso não exista
+        def LimpaCriaPasta(path):
+            if os.path.exists(path):
+            # Apaga todo o conteúdo do diretório
+                for filename in os.listdir(path):
+                    file_path = os.path.join(path, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)  # Remove o arquivo ou link simbólico
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)  # Remove o diretório e todo seu conteúdo
+                    except Exception as e:
+                        print(f'Falha ao apagar {file_path}. Razão: {e}')
+            else:
+                # Cria o diretório se não existir
+                os.makedirs(path)
+                print(f'Diretório {path} criado.')
+        
+        iniciais = "iniciais"
+        finais = "finais"
+        treinamento_sem_validacao_cruzada = "log/configuracao/treinamento_sem_validacao_cruzada/"
+        treinamento_com_validacao_cruzada = "log/configuracao/treinamento_com_validacao_cruzada/"
+        
+        # Limpa ou cria as pastas para o treinamento sem validação cruzada
+        LimpaCriaPasta(treinamento_sem_validacao_cruzada+iniciais)
+        LimpaCriaPasta(treinamento_sem_validacao_cruzada+finais)
+        # Limpa ou cria as pastas para os folds para o treinamento com validação cruzada
+        for fold in range(numero_de_folds):
+            LimpaCriaPasta(treinamento_com_validacao_cruzada + f"config_folds_{fold+1}/" + iniciais)
+            LimpaCriaPasta(treinamento_com_validacao_cruzada + f"config_folds_{fold+1}/" + finais)
